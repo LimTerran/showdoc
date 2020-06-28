@@ -83,7 +83,7 @@ class UserController extends BaseController {
 
     //登录
     public function login(){
-        $username = I("username");
+        $username = trim(I("username"));
         $password = I("password");
         $v_code = I("v_code");
         if (!$password) {
@@ -267,8 +267,8 @@ class UserController extends BaseController {
         $uid = $login_user['uid'] ;
         $username = I("username");
         $field = "username as value" ;
-        $username = \SQLite3::escapeString($username) ;
         if ($username) {
+            $username = \SQLite3::escapeString($username) ;
             $where = " username like '%{$username}%'" ;
         }else{
             $where = ' 1 = 1 ';

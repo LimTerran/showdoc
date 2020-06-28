@@ -67,6 +67,9 @@ class ItemController extends BaseController {
             $menu['pages'] = $pages ? $pages : array();
         }else{
             $menu = D("Item")->getMemu($item_id) ;
+            if($uid > 0 ){
+                $menu = D("Item")->filteMemberItem($uid , $item_id , $menu);
+            }
         }
 
         $domain = $item['item_domain'] ? $item['item_domain'] : $item['item_id'];
@@ -106,7 +109,11 @@ class ItemController extends BaseController {
             $help_url = "https://www.showdoc.cc/help";
         }
 
-
+        //当已经归档了，则去掉编辑权限
+        if($item['is_archived']){
+            $ItemPermn = $ItemCreator = false; 
+        }
+        
         $return = array(
             "item_id"=>$item_id ,
             "item_domain"=>$item['item_domain'] ,
@@ -117,7 +124,7 @@ class ItemController extends BaseController {
             "default_cat_id3"=>$default_cat_id3 ,
             "default_cat_id4"=>$default_cat_id4 ,
             "unread_count"=>$unread_count ,
-            "item_type"=>1 ,
+            "item_type"=>$item['item_type'] ,
             "menu"=>$menu ,
             "is_login"=>$is_login,
             "ItemPermn"=>$ItemPermn ,
@@ -182,7 +189,7 @@ class ItemController extends BaseController {
                 $member_item_ids[] = $value['item_id'] ;
             }
         }
-        $items  = D("Item")->field("item_id,uid,item_name,item_domain,item_type,last_update_time,item_description,is_del")->where("uid = '$login_user[uid]' or item_id in ( ".implode(",", $member_item_ids)." ) ")->order("item_id asc")->select();
+        $items  = D("Item")->field("item_id,uid,item_name,item_domain,item_type,last_update_time,item_description,is_del,password")->where("uid = '$login_user[uid]' or item_id in ( ".implode(",", $member_item_ids)." ) ")->order("item_id asc")->select();
         
         
         foreach ($items as $key => $value) {
@@ -190,7 +197,15 @@ class ItemController extends BaseController {
                $items[$key]['creator'] = 1 ;
             }else{
                $items[$key]['creator'] = 0 ;
+               unset($items[$key]['password']);
             }
+            //判断是否为私密项目
+            if ($value['password']) {
+                $items[$key]['is_private'] = 1 ; 
+            }else{
+                $items[$key]['is_private'] = 0 ; 
+            }
+            
             //如果项目已标识为删除
             if ($value['is_del'] == 1) {
                 unset($items[$key]);
@@ -544,9 +559,9 @@ class ItemController extends BaseController {
                 $this->sendError(10103);
                 return;
             }
-            $ret = D("Item")->copy($copy_item_id,$login_user['uid'],$item_name,$item_description,$password,$item_domain);
-            if ($ret) {
-                $this->sendResult(array());             
+            $item_id = D("Item")->copy($copy_item_id,$login_user['uid'],$item_name,$item_description,$password,$item_domain);
+            if ($item_id) {
+                $this->sendResult(array("item_id"=>$item_id));               
             }else{
                 $this->sendError(10101);
             }
@@ -579,7 +594,7 @@ class ItemController extends BaseController {
                     );
                 $page_id = D("Page")->add($insert);
             }
-            $this->sendResult(array());               
+            $this->sendResult(array("item_id"=>$item_id));               
         }else{
             $this->sendError(10101);
         }
@@ -606,15 +621,14 @@ class ItemController extends BaseController {
         $login_user = $this->checkLogin();
 
         $item_id = I("item_id/d");
+        $ret = D("ItemMember")->where("item_id = '$item_id' and uid ='$login_user[uid]' ")->delete();
 
-        //判断，如果是处于团队中，则提示他去请团队管理者把ta从团队中删除
         $row = D("TeamItemMember")->join(" left join team on team.id = team_item_member.team_id ")->where("item_id = '$item_id' and member_uid ='$login_user[uid]' ")->find();
         if ($row) {
-           $this->sendError(10101,"你目前处于团队'{$row[team_name]}'中。你可以请'{$row[username]}'把你从团队成员中删除");
-           return ;
+            $ret = D("TeamItemMember")->where(" member_uid = '$login_user[uid]' and  team_id = '$row[team_id]' ")->delete();
+            $ret = D("TeamMember")->where(" member_uid = '$login_user[uid]' and  team_id = '$row[team_id]' ")->delete();
         }
-        //如果不是处于团队中，仅仅是项目成员，则直接删除
-        $ret = D("ItemMember")->where("item_id = '$item_id' and uid ='$login_user[uid]' ")->delete();
+        
 
         if ($ret) {
            $this->sendResult(array());

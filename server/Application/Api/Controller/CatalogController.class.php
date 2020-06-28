@@ -13,6 +13,7 @@ class CatalogController extends BaseController {
         }
         if ($item_id > 0 ) {
             $ret = D("Catalog")->getList($item_id);
+            $ret = D("Catalog")->filteMemberCat($login_user['uid'] , $ret);
         }
         if ($ret) {
            $this->sendResult($ret);
@@ -31,6 +32,7 @@ class CatalogController extends BaseController {
         }
         if ($item_id > 0 ) {
             $ret = D("Catalog")->getList($item_id,true);
+            $ret = D("Catalog")->filteMemberCat($login_user['uid'] , $ret);
         }
         if ($ret) {
            $this->sendResult($ret);
@@ -119,10 +121,10 @@ class CatalogController extends BaseController {
                 return;
             }
             //如果一个目录已经是别的目录的父目录，那么它将无法再转为level4目录
-            if (D("Catalog")->where(" parent_cat_id = '$cat_id' ")->find() && $data['level'] == 4 ) {
-                $this->sendError(10101,"该目录含有子目录，不允许转为底层目录。");
-                return;
-            }
+            //if (D("Catalog")->where(" parent_cat_id = '$cat_id' ")->find() && $data['level'] == 4 ) {
+                //$this->sendError(10101,"该目录含有子目录，不允许转为底层目录。");
+                //return;
+            //}
             
             $ret = D("Catalog")->where(" cat_id = '$cat_id' ")->save($data);
             $return = D("Catalog")->where(" cat_id = '$cat_id' ")->find();
@@ -230,6 +232,12 @@ class CatalogController extends BaseController {
                         "cat_name" => $value['cat_name'] ,
                         "parent_cat_id" => $value['parent_cat_id'] ,
                         "level" => $value['level'] ,
+                        "s_number" => $value['s_number'] ,
+                        ));
+                }
+                if ($value['page_id'] > 0) {
+                    $ret = D("Page")->where(" page_id = '$value[page_id]' and item_id = '$item_id' ")->save(array(
+                        "cat_id" => $value['parent_cat_id'] ,
                         "s_number" => $value['s_number'] ,
                         ));
                 }
